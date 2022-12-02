@@ -1,12 +1,15 @@
 import time
-import board
-import adafruit_bmp3xx
-from __future__ import print_function
-import qwiic_kx13x
-import time
 import sys
 import logging
+# from __future__ import print_function
+from csv import writer
+import board
 
+from Adafruit_BNO055 import BNO055
+import adafruit_bmp3xx
+import qwiic_kx13x
+
+# bno documentation https://docs.circuitpython.org/projects/bno055/en/latest/
 def main():
     # set up bmp
     i2c = board.I2C()  # uses board.SCL and board.SDA
@@ -42,22 +45,50 @@ def main():
         print('System error: {0}'.format(error))
         print('See datasheet section 4.3.59 for the meaning.')
 
-    # collect bmp data
-    measured_pressure = bmp.pressure
-    measured_temp = bmp.temperature
-    measured_alt = bmp.altitude
-
-    # collect qwiic data
-    myKx.get_accel_data()
-    measured_ax = myKx.kx134_accel.x
-    measured_ay = myKx.kx134_accel.y
-    measured_az = myKx.kx134_accel.z
-
-    # collect BNO data
-    # Read the Euler angles for heading, roll, pitch (all in degrees).
-    heading, roll, pitch = bno.read_euler()
     # Read the calibration status, 0=uncalibrated and 3=fully calibrated.
     sys, gyro, accel, mag = bno.get_calibration_status()
+
+    with open('data.csv', 'w', newline='') as f:
+        data_writer = writer(f)
+        time_tracker = 0
+        while True:
+            # data: pressure, temp, alt, ax, ay, az,
+            current_data = []
+            # collect bmp data
+            measured_pressure = bmp.pressure
+            measured_temp = bmp.temperature
+            measured_alt = bmp.altitude
+            # append data
+            current_data.append(measured_pressure)
+            current_data.append(measured_temp)
+            current_data.append(measured_alt)
+
+            # collect qwiic data
+            myKx.get_accel_data()
+            measured_ax = myKx.kx134_accel.x
+            measured_ay = myKx.kx134_accel.y
+            measured_az = myKx.kx134_accel.z
+            # append data
+            current_data.append(measured_ax)
+            current_data.append(measured_ay)
+            current_data.append(measured_az)
+
+            # collect BNO data
+            # Read the Euler angles for heading, roll, pitch (all in degrees).
+            heading, roll, pitch = bno.read_euler()
+            bno_accel = bno.acceleration
+            bno_gyro = bno.gyro
+            # append data
+            current_data.append(heading)
+            current_data.append(roll)
+            current_data.append(pitch)
+            current_data.append(bno_accel)
+            current_data.append(bno_gyro)
+
+            print(current_data)
+            data_writer.writerow(current_data)
+            time_tracker += 0.1
+            time.sleep(0.1)
 
 
 if __name__ == '__main__':
