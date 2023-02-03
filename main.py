@@ -4,13 +4,20 @@ import logging
 # from __future__ import print_function
 from csv import writer
 import board
-
+import RPi.GPIO as GPIO
 from Adafruit_BNO055 import BNO055
 import adafruit_bmp3xx
 import qwiic_kx13x
 
 # bno documentation https://docs.circuitpython.org/projects/bno055/en/latest/
 def main():
+    # set up GPIO
+    output_voltage_pin = 0;
+    GPIO.setmode(GPIO.BOARD)  # choose BCM or BOARD
+    GPIO.setup(output_voltage_pin, GPIO.OUT)  # set a port/pin as an output
+    # GPIO.output(output_voltage_pin, 1)  # set port/pin value to 1/GPIO.HIGH/True
+    # GPIO.output(output_voltage_pin, 0)  # set port/pin value to 0/GPIO.LOW/False
+
     # set up bmp
     i2c = board.I2C()  # uses board.SCL and board.SDA
     bmp = adafruit_bmp3xx.BMP3XX_I2C(i2c)
@@ -51,6 +58,8 @@ def main():
     with open('data.csv', 'w', newline='') as f:
         data_writer = writer(f)
         time_tracker = 0
+        previous_altitude = 0;
+        decreasing_count = 0;
         while True:
             # data: pressure, temp, alt, ax, ay, az,
             current_data = []
@@ -86,8 +95,17 @@ def main():
             current_data.append(bno_gyro)
 
             print(current_data)
+
+            if previous_altitude > measured_alt:
+                decreasing_count += 1
+
+            if decreasing_count > 50:
+                GPIO.output(output_voltage_pin, 1)
+
             data_writer.writerow(current_data)
+
             time_tracker += 0.1
+            previous_altitude = measured_alt
             time.sleep(0.1)
 
 
