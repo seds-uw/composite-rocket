@@ -1,19 +1,18 @@
 import time
 import sys
 import logging
-# from __future__ import print_function
-from csv import writer
 import board
 import RPi.GPIO as GPIO
-from Adafruit_BNO055 import BNO055
 import adafruit_bmp3xx
 import qwiic_kx13x
+from csv import writer
+from Adafruit_BNO055 import BNO055
 
 # bno documentation https://docs.circuitpython.org/projects/bno055/en/latest/
 def main():
     # set up GPIO
-    output_voltage_pin = 0;
-    GPIO.setmode(GPIO.BOARD)  # choose BCM or BOARD
+    output_voltage_pin = 0
+    GPIO.setmode(GPIO.BCM)  # choose BCM or BOARD
     GPIO.setup(output_voltage_pin, GPIO.OUT)  # set a port/pin as an output
     # GPIO.output(output_voltage_pin, 1)  # set port/pin value to 1/GPIO.HIGH/True
     # GPIO.output(output_voltage_pin, 0)  # set port/pin value to 0/GPIO.LOW/False
@@ -40,6 +39,7 @@ def main():
     # Create and configure the BNO sensor connection.
     # Raspberry Pi configuration with serial UART and RST connected to GPIO 18:
     bno = BNO055.BNO055(serial_port='/dev/serial0', rst=18)
+    time.sleep(2)
     # Initialize the BNO055 and stop if something went wrong.
     if not bno.begin():
         raise RuntimeError('Failed to initialize BNO055! Is the sensor connected?')
@@ -58,8 +58,9 @@ def main():
     with open('data.csv', 'w', newline='') as f:
         data_writer = writer(f)
         time_tracker = 0
-        previous_altitude = 0;
-        decreasing_count = 0;
+        previous_altitude = 0
+        decreasing_count = 0
+
         while True:
             # data: pressure, temp, alt, ax, ay, az,
             current_data = []
@@ -85,22 +86,31 @@ def main():
             # collect BNO data
             # Read the Euler angles for heading, roll, pitch (all in degrees).
             heading, roll, pitch = bno.read_euler()
-            bno_accel = bno.acceleration
-            bno_gyro = bno.gyro
+            bno_accel_x, bno_accel_y, bno_accel_z = bno.read_accelerometer()
+            bno_gyro_x, bno_gyro_y, bno_gyro_z = bno.read_gyroscope()
             # append data
             current_data.append(heading)
             current_data.append(roll)
             current_data.append(pitch)
-            current_data.append(bno_accel)
-            current_data.append(bno_gyro)
+            current_data.append(bno_accel_x)
+            current_data.append(bno_accel_y)
+            current_data.append(bno_accel_z)
+            current_data.append(bno_gyro_x)
+            current_data.append(bno_gyro_y)
+            current_data.append(bno_gyro_z)
 
             print(current_data)
+            print("Decreasing Count: ", decreasing_count)
+            print()
 
-            if previous_altitude > measured_alt:
+            if previous_altitude > measured_alt: # TODO: floating point threshold
                 decreasing_count += 1
+            else:
+                decreasing_count = 0
 
-            if decreasing_count > 50:
+            if decreasing_count > 5: # TODO: determine appropriate value
                 GPIO.output(output_voltage_pin, 1)
+                break # TODO: remove break; continue data collection
 
             data_writer.writerow(current_data)
 
