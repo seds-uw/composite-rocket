@@ -58,8 +58,10 @@ def main():
     with open('data.csv', 'w', newline='') as f:
         data_writer = writer(f)
         time_tracker = 0
-        previous_altitude = 0
         decreasing_count = 0
+        prev_alt = []
+        prev_alt_limit = 5
+        prev_alt_avg = 0
 
         while True:
             # data: pressure, temp, alt, ax, ay, az,
@@ -99,23 +101,30 @@ def main():
             current_data.append(bno_gyro_y)
             current_data.append(bno_gyro_z)
 
-            print(current_data)
-            print("Decreasing Count: ", decreasing_count)
-            print()
 
-            if previous_altitude > measured_alt: # TODO: floating point threshold
+
+            prev_alt.append(measured_alt)
+            if len(prev_alt) > prev_alt_limit:
+                prev_alt.pop(0)
+            curr_alt_avg = sum(prev_alt) / len(prev_alt)
+
+            if prev_alt_avg > curr_alt_avg:  # TODO: floating point threshold
                 decreasing_count += 1
             else:
                 decreasing_count = 0
 
             if decreasing_count > 5: # TODO: determine appropriate value
                 GPIO.output(output_voltage_pin, 1)
-                break # TODO: remove break; continue data collection
+                break  # TODO: remove break; continue data collection
+
+            prev_alt_avg = curr_alt_avg
+
+            print(current_data)
+            print("Decreasing Count: ", decreasing_count)
+            print()
 
             data_writer.writerow(current_data)
-
             time_tracker += 0.1
-            previous_altitude = measured_alt
             time.sleep(0.1)
 
 
